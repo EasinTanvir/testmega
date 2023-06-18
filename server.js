@@ -26,6 +26,14 @@ mongoose
 app.use(async (req, res, next) => {
   try {
     const user = await APIONE.findOne();
+    if (!user) {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: process.env.Secret_Key,
+        })
+      );
+      app.set("gpt", openApi);
+    }
 
     const openApi = new OpenAIApi(
       new Configuration({
@@ -43,6 +51,15 @@ app.use(async (req, res, next) => {
 app.use(async (req, res, next) => {
   const user = await APITWO.findOne();
 
+  if (!user) {
+    const openApi = new OpenAIApi(
+      new Configuration({
+        apiKey: process.env.Secret_Key2,
+      })
+    );
+    app.set("gpt2", openApi);
+  }
+
   const openApi = new OpenAIApi(
     new Configuration({
       apiKey: user.apikey,
@@ -54,6 +71,14 @@ app.use(async (req, res, next) => {
 });
 app.use(async (req, res, next) => {
   const user = await APITHREE.findOne();
+  if (!user) {
+    const openApi = new OpenAIApi(
+      new Configuration({
+        apiKey: process.env.Secret_Key3,
+      })
+    );
+    app.set("gpt3", openApi);
+  }
 
   const openApi = new OpenAIApi(
     new Configuration({
