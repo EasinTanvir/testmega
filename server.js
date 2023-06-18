@@ -96,7 +96,7 @@ app.use(authRoutes);
 app.use(adminRoutes);
 
 app.use((req, res, next) => {
-  const errors = new HttpError("No route found for this path", 404);
+  const errors = new HttpError("No route found for this paths", 404);
   return next(errors);
 });
 
