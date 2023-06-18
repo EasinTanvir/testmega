@@ -33,14 +33,14 @@ app.use(async (req, res, next) => {
         })
       );
       app.set("gpt", openApi);
+    } else {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: user.apikey,
+        })
+      );
+      app.set("gpt", openApi);
     }
-
-    const openApi = new OpenAIApi(
-      new Configuration({
-        apiKey: user.apikey,
-      })
-    );
-    app.set("gpt", openApi);
   } catch (err) {
     const errors = new HttpError("No Api Key Found", 500);
     return next(errors);
@@ -49,43 +49,53 @@ app.use(async (req, res, next) => {
   next();
 });
 app.use(async (req, res, next) => {
-  const user = await APITWO.findOne();
+  try {
+    const user = await APITWO.findOne();
 
-  if (!user) {
-    const openApi = new OpenAIApi(
-      new Configuration({
-        apiKey: process.env.Secret_Key2,
-      })
-    );
-    app.set("gpt2", openApi);
+    if (!user) {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: process.env.Secret_Key2,
+        })
+      );
+      app.set("gpt2", openApi);
+    } else {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: user.apikey,
+        })
+      );
+      app.set("gpt2", openApi);
+    }
+  } catch (err) {
+    const errors = new HttpError("No Api Key Found", 500);
+    return next(errors);
   }
-
-  const openApi = new OpenAIApi(
-    new Configuration({
-      apiKey: user.apikey,
-    })
-  );
-  app.set("gpt2", openApi);
 
   next();
 });
 app.use(async (req, res, next) => {
-  const user = await APITHREE.findOne();
-  if (!user) {
-    const openApi = new OpenAIApi(
-      new Configuration({
-        apiKey: process.env.Secret_Key3,
-      })
-    );
-    app.set("gpt3", openApi);
+  try {
+    const user = await APITHREE.findOne();
+    if (!user) {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: process.env.Secret_Key3,
+        })
+      );
+      app.set("gpt3", openApi);
+    } else {
+      const openApi = new OpenAIApi(
+        new Configuration({
+          apiKey: user.apikey,
+        })
+      );
+      app.set("gpt3", openApi);
+    }
+  } catch (err) {
+    const errors = new HttpError("No Api Key Found", 500);
+    return next(errors);
   }
-
-  const openApi = new OpenAIApi(
-    new Configuration({
-      apiKey: user.apikey,
-    })
-  );
-  app.set("gpt3", openApi);
 
   next();
 });
