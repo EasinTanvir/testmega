@@ -5,6 +5,7 @@ const protectRoutes = require("../helper/protectRoutes");
 
 router.route("/gpt").post(gptRoutes.createGpt);
 router.route("/autogpt").post(gptRoutes.autoMessageGenrator);
+router.route("/imagetotext").post(gptRoutes.imageToTextGenerator);
 router.route("/symptomsgpt").post(gptRoutes.symptomsGenarator);
 router.route("/pubmed").post(gptRoutes.pubmedArticles);
 router.route("/gpts").post(gptRoutes.getMessage);

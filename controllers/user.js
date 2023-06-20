@@ -7,11 +7,14 @@ require("dotenv").config();
 const { JSDOM } = require("jsdom");
 const HttpError = require("../helper/HttpError");
 const bcrypt = require("bcryptjs");
+const { ImageAnnotatorClient } = require("@google-cloud/vision");
+const IMAGETEXT = require("../models/imagetext");
+const DATAMODEL = require("../models/jsonDataModel");
 
 const createGpt = async (req, res, next) => {
   const openAi = req.app.get("gpt");
   const { extraId, message, messages, text, converId } = req.body;
-
+  let sentence = "";
   //console.log(message);
 
   //protect block
@@ -34,7 +37,8 @@ const createGpt = async (req, res, next) => {
     try {
       lmessages = await MESSAGE.find({ userId: req.body.extraId });
     } catch (err) {
-      console.log(err);
+      const errors = new HttpError("Message find failed", 500);
+      return next(errors);
     }
     if (lmessages.length === 3) {
       const errors = new HttpError(
@@ -46,6 +50,14 @@ const createGpt = async (req, res, next) => {
   }
   //protection
 
+  try {
+    const result = await IMAGETEXT.find({ userId: extraId });
+    sentence = result.map((item) => item.imagetext).toString();
+  } catch (err) {
+    const errors = new HttpError("Image Text fetch failed", 500);
+    return next(errors);
+  }
+
   let dbData;
 
   try {
@@ -53,7 +65,8 @@ const createGpt = async (req, res, next) => {
       $and: [{ userId: extraId }, { conversationId: converId }],
     });
   } catch (err) {
-    console.log(err);
+    const errors = new HttpError("fetch message failed", 500);
+    return next(errors);
   }
 
   let extraData;
@@ -63,7 +76,8 @@ const createGpt = async (req, res, next) => {
       $and: [{ userId: extraId }, { conversationId: converId }],
     });
   } catch (err) {
-    console.log(err);
+    const errors = new HttpError("fetch symptoms failed", 500);
+    return next(errors);
   }
 
   let assistantData = dbData.map((item) => item.gpt);
@@ -100,6 +114,10 @@ const createGpt = async (req, res, next) => {
         },
         {
           role: "user",
+          content: sentence,
+        },
+        {
+          role: "user",
           content: message,
         },
         {
@@ -118,6 +136,127 @@ const createGpt = async (req, res, next) => {
         "No Api key found pleasae insetn an api key from Amin panel ",
         500
       );
+      return next(errors);
+    });
+};
+
+const imageToTextGenerator = async (req, res, next) => {
+  const openAi = req.app.get("gpt2");
+  const { extraId, token, image, converId } = req.body;
+  let sentence = "";
+  let CONFIGDB = "";
+  //protect block
+  let blockUser;
+  try {
+    blockUser = await USER.findOne({ extraId: extraId });
+  } catch (err) {
+    const errors = new HttpError("Find block user failed", 500);
+    return next(errors);
+  }
+  if (blockUser?.block) {
+    const errors = new HttpError("Sorry your account has been blocked", 500);
+    return next(errors);
+  }
+  //protect block
+
+  //protection
+  let lmessages;
+  if (!token) {
+    try {
+      lmessages = await MESSAGE.find({ userId: extraId });
+    } catch (err) {
+      const errors = new HttpError("fetch messages failed", 500);
+      return next(errors);
+    }
+    if (lmessages.length === 3) {
+      const errors = new HttpError(
+        "Login / Signup for free to send more messages.",
+        500
+      );
+      return next(errors);
+    }
+  }
+  //protection
+
+  //get json data from user
+  try {
+    CONFIGDB = await DATAMODEL.findOne();
+  } catch (err) {
+    const errors = new HttpError("find json data failed", 500);
+    return next(errors);
+  }
+
+  //get json data from user
+
+  //parsing image
+
+  if (!CONFIGDB) {
+    const errors = new HttpError(
+      "Please  insert Json key for vision Api from admin panel",
+      500
+    );
+    return next(errors);
+  }
+
+  if (image) {
+    const CONFIG = {
+      credentials: {
+        private_key: CONFIGDB.private_key,
+        client_email: CONFIGDB.client_email,
+      },
+    };
+
+    const client = new ImageAnnotatorClient(CONFIG);
+    let [result] = await client.textDetection(image);
+
+    const ress = result.textAnnotations[0].description.split("\n");
+    sentence = ress.join(" ");
+    try {
+      await IMAGETEXT.create({
+        userId: extraId,
+        imagetext: sentence,
+        conversationId: converId,
+      });
+    } catch (err) {
+      const errors = new HttpError("Create Image to text failed", 500);
+      return next(errors);
+    }
+  }
+
+  try {
+    const result = await IMAGETEXT.find({
+      $and: [{ userId: extraId }, { conversationId: converId }],
+    });
+    sentence = result.map((item) => item.imagetext).toString();
+  } catch (err) {
+    const errors = new HttpError("Find Image to text failed", 500);
+    return next(errors);
+  }
+
+  //parsing image
+
+  openAi
+    .createChatCompletion({
+      model: "gpt-3.5-turbo",
+
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are AI Medicine Specialist chatbot. User will provide you the name of a medicine or prescription then you will describe the manufacturer ,uses, dosage, side effects, precaution of that medicine. Your response will be like that Manufacturer : describe the Manufacturer part. Uses : desribe the uses and follow the same rules for others parts",
+        },
+
+        {
+          role: "user",
+          content: sentence,
+        },
+      ],
+    })
+    .then((ress) => {
+      res.status(200).json({ result: ress.data });
+    })
+    .catch((err) => {
+      const errors = new HttpError("Chatgpt api not working", 500);
       return next(errors);
     });
 };
@@ -146,7 +285,8 @@ const autoMessageGenrator = async (req, res, next) => {
     try {
       lmessages = await MESSAGE.find({ userId: extraId });
     } catch (err) {
-      console.log(err);
+      const errors = new HttpError("Messages fetch failed", 500);
+      return next(errors);
     }
     if (lmessages.length === 3) {
       const errors = new HttpError(
@@ -184,7 +324,8 @@ const autoMessageGenrator = async (req, res, next) => {
       res.status(200).json({ result: result });
     })
     .catch((err) => {
-      console.log(err);
+      const errors = new HttpError("Chatgpt api not working", 500);
+      return next(errors);
     });
 };
 
@@ -214,7 +355,8 @@ const symptomsGenarator = async (req, res, next) => {
       res.status(200).json({ result: test2 });
     })
     .catch((err) => {
-      console.log(err);
+      const errors = new HttpError("Chatgpt api not working", 500);
+      return next(errors);
     });
 };
 
@@ -442,6 +584,12 @@ const deleteMessages = async (req, res, next) => {
     const errors = new HttpError("delete message failed", 500);
     return next(errors);
   }
+  try {
+    await IMAGETEXT.deleteMany({ conversationId: req.body.converId });
+  } catch (err) {
+    const errors = new HttpError("delete message failed", 500);
+    return next(errors);
+  }
 
   res.status(200).json({ message: "Conversation clear successfull" });
 };
@@ -592,4 +740,5 @@ module.exports = {
   autoMessageGenrator,
   symptomsGenarator,
   pubmedArticles,
+  imageToTextGenerator,
 };
